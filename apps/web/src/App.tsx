@@ -7,7 +7,9 @@ import type {
 import { MigrationForm } from './components/MigrationForm';
 import { MigrationProgressPanel } from './components/MigrationProgressPanel';
 import { ProviderCard } from './components/ProviderCard';
+import { ProviderConnectModal } from './components/ProviderConnectModal';
 import { useMigrationStream } from './hooks/useMigrationStream';
+import { useOAuthPopup } from './hooks/useOAuthPopup';
 import {
   disconnectProvider,
   fetchApiHealth,
@@ -17,9 +19,30 @@ import {
 } from './services/api';
 
 const FALLBACK_STATUSES: ProviderAuthStatus[] = [
-  { provider: 'spotify', connected: false, configured: false, supportsPublicRead: false },
-  { provider: 'deezer', connected: false, configured: false, supportsPublicRead: true },
-  { provider: 'youtube', connected: false, configured: false, supportsPublicRead: false },
+  {
+    provider: 'spotify',
+    connected: false,
+    configured: false,
+    redirectUri: 'http://127.0.0.1:3333/auth/spotify/callback',
+    hasSecret: false,
+    supportsPublicRead: false,
+  },
+  {
+    provider: 'deezer',
+    connected: false,
+    configured: false,
+    redirectUri: 'http://localhost:3333/auth/deezer/callback',
+    hasSecret: false,
+    supportsPublicRead: true,
+  },
+  {
+    provider: 'youtube',
+    connected: false,
+    configured: false,
+    redirectUri: 'http://localhost:3333/auth/youtube/callback',
+    hasSecret: false,
+    supportsPublicRead: false,
+  },
 ];
 
 export function App() {
@@ -29,6 +52,7 @@ export function App() {
   const [busyProvider, setBusyProvider] = useState(false);
   const [banner, setBanner] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [modalProvider, setModalProvider] = useState<ProviderType | null>(null);
 
   const stream = useMigrationStream(activeJobId);
 
@@ -45,6 +69,19 @@ export function App() {
       setHealthError(err instanceof Error ? err.message : 'API indisponível');
     }
   }, []);
+
+  const { connectingProvider, openLoginPopup } = useOAuthPopup({
+    onSuccess: (provider) => {
+      setBanner({
+        kind: 'success',
+        text: `Conta ${provider} conectada com sucesso na sessão.`,
+      });
+      void refreshStatus();
+    },
+    onError: (message) => {
+      setBanner({ kind: 'error', text: message });
+    },
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -78,10 +115,45 @@ export function App() {
     }
   };
 
+  const handleConnectProvider = useCallback(
+    (provider: ProviderType) => {
+      const status = providers.find((item) => item.provider === provider);
+      if (status?.configured) {
+        openLoginPopup(provider);
+      } else {
+        setModalProvider(provider);
+      }
+    },
+    [openLoginPopup, providers],
+  );
+
+  const handleModalSaved = useCallback(
+    (updated: ProviderAuthStatus, openLoginAfterSave: boolean) => {
+      setProviders((prev) =>
+        prev.map((item) => (item.provider === updated.provider ? updated : item)),
+      );
+      setModalProvider(null);
+
+      if (openLoginAfterSave && updated.configured) {
+        openLoginPopup(updated.provider);
+      } else {
+        setBanner({
+          kind: 'success',
+          text: `Configuração OAuth de ${updated.provider} atualizada.`,
+        });
+      }
+    },
+    [openLoginPopup],
+  );
+
   const handleStartMigration = async (payload: StartMigrationRequest) => {
     const started = await startMigration(payload);
     setActiveJobId(started.jobId);
   };
+
+  const modalStatus = modalProvider
+    ? providers.find((item) => item.provider === modalProvider) ?? null
+    : null;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-10">
@@ -137,6 +209,9 @@ export function App() {
               key={status.provider}
               status={status}
               busy={busyProvider}
+              connecting={connectingProvider === status.provider}
+              onConnect={handleConnectProvider}
+              onConfigure={(provider) => setModalProvider(provider)}
               onDisconnect={handleDisconnect}
             />
           ))}
@@ -145,6 +220,7 @@ export function App() {
         <MigrationForm
           providers={providers}
           isRunning={stream.status === 'running'}
+          onConnectProvider={handleConnectProvider}
           onSubmit={handleStartMigration}
         />
 
@@ -155,6 +231,12 @@ export function App() {
         SyncSound — Arquitetura Hexagonal (Ports & Adapters) • Stateless / In-Memory local com
         extensão pronta para PostgreSQL / Supabase.
       </footer>
+
+      <ProviderConnectModal
+        status={modalStatus}
+        onClose={() => setModalProvider(null)}
+        onSaved={handleModalSaved}
+      />
     </div>
   );
 }

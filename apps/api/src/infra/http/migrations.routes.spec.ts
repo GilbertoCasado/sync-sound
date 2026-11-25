@@ -54,6 +54,7 @@ const TEST_ENV = {
   NODE_ENV: 'test' as const,
   FRONTEND_URL: 'http://localhost:5173',
   SESSION_SECRET: 'test-session-secret-0123456789',
+  OAUTH_CONFIG_FILE: '/tmp/syncsound-nonexistent-migrations-spec-oauth.json',
 };
 
 describe('API Routes & SSE Streaming', () => {

@@ -46,19 +46,29 @@ Acesse `http://localhost:5173`.
 - O **Deezer** suporta leitura pública de playlists e busca no catálogo sem login OAuth.
 - Mesmo sem configurar `.env`, você pode testar o fluxo completo da interface selecionando **Deezer** como origem com uma URL/ID de playlist pública e mantendo **Modo Simulação (`dryRun`)** ativado (ex.: para simular contra catálogo público Deezer → Deezer, ou executando a suíte automatizada com `npm test`).
 
-## Configurando OAuth 2.0 (`.env`)
+## Configurando OAuth 2.0 (pela Interface ou `.env`)
 
-| Plataforma | Redirect URI | Variáveis no `.env` |
+Você pode configurar e conectar cada plataforma **diretamente pela janela da interface web** (clicando em **Conectar** ou **Configurar** em qualquer card ou no formulário de migração):
+
+- A janela de conexão exibe o passo a passo, link direto para o portal Developer oficial, botão para copiar a **Redirect URI** e salva os dados localmente em `.syncsound.oauth.json` (arquivo ignorado pelo Git) sem precisar editar `.env` nem reiniciar o servidor.
+- Ao clicar em **Salvar e abrir janela de login**, o login oficial é aberto em uma janela popup que fecha automaticamente e atualiza o status na tela via `postMessage`.
+
+Se preferir configurar via `.env`, utilize os valores abaixo:
+
+| Plataforma | Redirect URI padrão | Variáveis no `.env` |
 | :--- | :--- | :--- |
-| **Spotify** | `http://localhost:3333/auth/spotify/callback` | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI` |
+| **Spotify** | `http://127.0.0.1:3333/auth/spotify/callback` | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI` |
 | **Deezer** | `http://localhost:3333/auth/deezer/callback` | `DEEZER_APP_ID`, `DEEZER_SECRET`, `DEEZER_REDIRECT_URI` |
 | **YouTube Music** | `http://localhost:3333/auth/youtube/callback` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` |
+
+> **Atenção (Spotify):** o Spotify exige endereço loopback IPv4 (`127.0.0.1`, não `localhost`) nas Redirect URIs locais.
 
 ## Endpoints da API (`apps/api`)
 
 - `GET /api/health` — status e modo de execução (`stateless-in-memory` ou `postgres`)
 - `GET /api/auth/status` — estado de conexão e configuração OAuth por provedor
-- `GET /auth/:provider/login` & `GET /auth/:provider/callback` — fluxo OAuth 2.0 com state CSRF em sessão `HttpOnly`
+- `PUT /api/auth/:provider/config` & `DELETE /api/auth/:provider/config` — salva/remove credenciais OAuth locais pela UI
+- `GET /auth/:provider/login` (`?mode=popup`) & `GET /auth/:provider/callback` — fluxo OAuth 2.0 com state CSRF de uso único em sessão `HttpOnly`
 - `POST /api/auth/:provider/disconnect` — desconecta um provedor da sessão
 - `GET /api/providers/:provider/playlists` — lista playlists do usuário autenticado
 - `GET /api/providers/:provider/playlists/:playlistId` — detalha playlist e faixas

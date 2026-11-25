@@ -26,11 +26,21 @@ const PROVIDER_META: Record<ProviderType, ProviderMeta> = {
 
 export interface ProviderCardProps {
   status: ProviderAuthStatus;
+  onConnect: (provider: ProviderType) => void;
+  onConfigure: (provider: ProviderType) => void;
   onDisconnect: (provider: ProviderType) => Promise<void>;
+  connecting?: boolean;
   busy?: boolean;
 }
 
-export function ProviderCard({ status, onDisconnect, busy = false }: ProviderCardProps) {
+export function ProviderCard({
+  status,
+  onConnect,
+  onConfigure,
+  onDisconnect,
+  connecting = false,
+  busy = false,
+}: ProviderCardProps) {
   const meta = PROVIDER_META[status.provider];
 
   return (
@@ -54,34 +64,52 @@ export function ProviderCard({ status, onDisconnect, busy = false }: ProviderCar
             Leitura pública disponível mesmo sem login OAuth.
           </p>
         )}
-        {!status.configured && !status.connected && (
-          <p className="mt-2 text-xs text-amber-300/90">
-            Credenciais OAuth ainda não configuradas no <code>.env</code>.
+        {status.configured && !status.connected && status.clientIdPreview && (
+          <p className="mt-2 text-xs text-slate-400">
+            App configurado (<code>{status.clientIdPreview}</code>)
           </p>
         )}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex gap-2">
         {status.connected ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onDisconnect(status.provider)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Desconectar
-          </button>
-        ) : status.configured ? (
-          <a
-            href={`/auth/${status.provider}/login`}
-            className="block w-full rounded-lg bg-slate-100 px-3 py-2 text-center text-sm font-semibold text-slate-950 transition hover:bg-white"
-          >
-            Conectar {meta.label}
-          </a>
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onDisconnect(status.provider)}
+              className="flex-1 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Desconectar
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfigure(status.provider)}
+              className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-800"
+            >
+              Configurar
+            </button>
+          </>
         ) : (
-          <span className="block w-full rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 text-center text-xs text-slate-400">
-            Configure o OAuth no .env para conectar
-          </span>
+          <>
+            <button
+              type="button"
+              disabled={connecting || busy}
+              onClick={() => onConnect(status.provider)}
+              className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-center text-sm font-semibold text-slate-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {connecting ? 'Aguardando login...' : `Conectar ${meta.label}`}
+            </button>
+            {status.configured && (
+              <button
+                type="button"
+                onClick={() => onConfigure(status.provider)}
+                className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-800"
+              >
+                Configurar
+              </button>
+            )}
+          </>
         )}
       </div>
     </article>

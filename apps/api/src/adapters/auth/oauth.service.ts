@@ -1,49 +1,78 @@
-import type { ProviderType } from '@syncsound/shared';
+import type {
+  OAuthConfigSource,
+  ProviderType,
+  SaveProviderOAuthConfigRequest,
+} from '@syncsound/shared';
 import type { ProviderCredentials } from '../../core/ports/music-provider.port.js';
-import type { AppEnv } from '../../infra/config/env.js';
 import { fetchJsonWithRetry, type FetchLike } from '../providers/http-client.js';
+import {
+  FileOAuthConfigStore,
+  maskClientId,
+  type OAuthProviderConfig,
+} from './oauth-config.store.js';
+
+export interface ProviderOAuthStatusMeta {
+  configured: boolean;
+  configSource: OAuthConfigSource;
+  clientIdPreview?: string;
+  redirectUri: string;
+  hasSecret: boolean;
+}
 
 export class OAuthService {
   constructor(
-    private readonly env: AppEnv,
+    private readonly configStore: FileOAuthConfigStore,
     private readonly fetchFn: FetchLike = fetch,
   ) {}
 
-  isConfigured(provider: ProviderType): boolean {
-    if (provider === 'spotify') {
-      return (
-        this.isRealValue(this.env.SPOTIFY_CLIENT_ID) &&
-        this.isRealValue(this.env.SPOTIFY_CLIENT_SECRET) &&
-        this.isRealValue(this.env.SPOTIFY_REDIRECT_URI)
-      );
+  async getStatusMeta(provider: ProviderType): Promise<ProviderOAuthStatusMeta> {
+    const resolved = await this.configStore.getProviderConfig(provider);
+    if (!resolved.config) {
+      return {
+        configured: false,
+        configSource: 'none',
+        redirectUri: resolved.defaultRedirectUri,
+        hasSecret: false,
+      };
     }
 
-    if (provider === 'deezer') {
-      return (
-        this.isRealValue(this.env.DEEZER_APP_ID) &&
-        this.isRealValue(this.env.DEEZER_SECRET) &&
-        this.isRealValue(this.env.DEEZER_REDIRECT_URI)
-      );
-    }
-
-    return (
-      this.isRealValue(this.env.GOOGLE_CLIENT_ID) &&
-      this.isRealValue(this.env.GOOGLE_CLIENT_SECRET) &&
-      this.isRealValue(this.env.GOOGLE_REDIRECT_URI)
-    );
+    return {
+      configured: true,
+      configSource: resolved.source,
+      clientIdPreview: maskClientId(resolved.config.clientId),
+      redirectUri: resolved.config.redirectUri,
+      hasSecret: Boolean(resolved.config.clientSecret),
+    };
   }
 
-  getAuthorizeUrl(provider: ProviderType, state: string): string {
-    if (!this.isConfigured(provider)) {
-      throw new Error(`Credenciais OAuth para "${provider}" não configuradas no .env.`);
-    }
+  async isConfigured(provider: ProviderType): Promise<boolean> {
+    const resolved = await this.configStore.getProviderConfig(provider);
+    return Boolean(resolved.config);
+  }
+
+  async saveConfig(
+    provider: ProviderType,
+    input: SaveProviderOAuthConfigRequest,
+  ): Promise<ProviderOAuthStatusMeta> {
+    await this.configStore.saveProviderConfig(provider, input);
+    return this.getStatusMeta(provider);
+  }
+
+  async clearConfig(provider: ProviderType): Promise<ProviderOAuthStatusMeta> {
+    await this.configStore.deleteProviderConfig(provider);
+    return this.getStatusMeta(provider);
+  }
+
+  async getAuthorizeUrl(provider: ProviderType, state: string): Promise<string> {
+    const config = await this.requireConfig(provider);
 
     if (provider === 'spotify') {
       const params = new URLSearchParams({
         response_type: 'code',
-        client_id: this.env.SPOTIFY_CLIENT_ID!,
-        redirect_uri: this.env.SPOTIFY_REDIRECT_URI!,
-        scope: 'playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public',
+        client_id: config.clientId,
+        redirect_uri: config.redirectUri,
+        scope:
+          'playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public',
         state,
       });
       return `https://accounts.spotify.com/authorize?${params.toString()}`;
@@ -51,8 +80,8 @@ export class OAuthService {
 
     if (provider === 'deezer') {
       const params = new URLSearchParams({
-        app_id: this.env.DEEZER_APP_ID!,
-        redirect_uri: this.env.DEEZER_REDIRECT_URI!,
+        app_id: config.clientId,
+        redirect_uri: config.redirectUri,
         perms: 'basic_access,manage_library,offline_access',
         state,
       });
@@ -61,8 +90,8 @@ export class OAuthService {
 
     const params = new URLSearchParams({
       response_type: 'code',
-      client_id: this.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: this.env.GOOGLE_REDIRECT_URI!,
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
       scope: 'https://www.googleapis.com/auth/youtube',
       access_type: 'offline',
       prompt: 'consent',
@@ -72,19 +101,15 @@ export class OAuthService {
   }
 
   async exchangeCode(provider: ProviderType, code: string): Promise<ProviderCredentials> {
-    if (!this.isConfigured(provider)) {
-      throw new Error(`Credenciais OAuth para "${provider}" não configuradas no .env.`);
-    }
+    const config = await this.requireConfig(provider);
 
     if (provider === 'spotify') {
-      const basicAuth = Buffer.from(
-        `${this.env.SPOTIFY_CLIENT_ID}:${this.env.SPOTIFY_CLIENT_SECRET}`,
-      ).toString('base64');
+      const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64');
 
       const body = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: this.env.SPOTIFY_REDIRECT_URI!,
+        redirect_uri: config.redirectUri,
       });
 
       const tokenResponse = await fetchJsonWithRetry<{
@@ -115,8 +140,8 @@ export class OAuthService {
 
     if (provider === 'deezer') {
       const params = new URLSearchParams({
-        app_id: this.env.DEEZER_APP_ID!,
-        secret: this.env.DEEZER_SECRET!,
+        app_id: config.clientId,
+        secret: config.clientSecret,
         code,
         output: 'json',
       });
@@ -147,9 +172,9 @@ export class OAuthService {
     const googleBody = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      client_id: this.env.GOOGLE_CLIENT_ID!,
-      client_secret: this.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: this.env.GOOGLE_REDIRECT_URI!,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri: config.redirectUri,
     });
 
     const tokenResponse = await fetchJsonWithRetry<{
@@ -175,11 +200,11 @@ export class OAuthService {
     };
   }
 
-  private isRealValue(value?: string): boolean {
-    if (!value) {
-      return false;
+  private async requireConfig(provider: ProviderType): Promise<OAuthProviderConfig> {
+    const resolved = await this.configStore.getProviderConfig(provider);
+    if (!resolved.config) {
+      throw new Error(`Credenciais OAuth para "${provider}" não configuradas.`);
     }
-    const trimmed = value.trim();
-    return Boolean(trimmed) && !trimmed.startsWith('seu_');
+    return resolved.config;
   }
 }

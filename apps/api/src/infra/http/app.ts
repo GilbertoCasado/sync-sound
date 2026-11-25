@@ -1,6 +1,7 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { FileOAuthConfigStore } from '../../adapters/auth/oauth-config.store.js';
 import { OAuthService } from '../../adapters/auth/oauth.service.js';
 import { InMemoryMappingCacheRepository } from '../../adapters/cache/in-memory-mapping-cache.repository.js';
 import { DeezerAdapter } from '../../adapters/providers/deezer.adapter.js';
@@ -26,6 +27,7 @@ export interface AppDependencies {
   cacheRepository?: IMappingCacheRepository;
   sessionStore?: ISessionStore;
   providerRegistry?: ProviderRegistry;
+  oauthConfigStore?: FileOAuthConfigStore;
   oauthService?: OAuthService;
 }
 
@@ -41,7 +43,8 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   const cacheRepository = deps.cacheRepository ?? new InMemoryMappingCacheRepository();
   const sessionStore = deps.sessionStore ?? new InMemorySessionStore();
   const providerRegistry = deps.providerRegistry ?? createDefaultProviderRegistry();
-  const oauthService = deps.oauthService ?? new OAuthService(env);
+  const oauthConfigStore = deps.oauthConfigStore ?? new FileOAuthConfigStore(env, env.OAUTH_CONFIG_FILE);
+  const oauthService = deps.oauthService ?? new OAuthService(oauthConfigStore);
 
   const metadataCleaner = new MetadataCleaner();
   const matchingEngine = new MatchingEngine(cacheRepository, metadataCleaner);

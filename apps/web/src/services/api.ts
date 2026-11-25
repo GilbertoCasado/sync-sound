@@ -4,6 +4,7 @@ import type {
   PlaylistSummary,
   ProviderAuthStatus,
   ProviderType,
+  SaveProviderOAuthConfigRequest,
   StartMigrationRequest,
   StartMigrationResponse,
 } from '@syncsound/shared';
@@ -42,6 +43,25 @@ export async function fetchAuthStatus(): Promise<ProviderAuthStatus[]> {
 export async function disconnectProvider(provider: ProviderType): Promise<void> {
   await requestJson<{ ok: boolean }>(`/api/auth/${provider}/disconnect`, {
     method: 'POST',
+  });
+}
+
+export async function saveProviderOAuthConfig(
+  provider: ProviderType,
+  payload: SaveProviderOAuthConfigRequest,
+): Promise<ProviderAuthStatus> {
+  return requestJson<ProviderAuthStatus>(`/api/auth/${provider}/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteProviderOAuthConfig(
+  provider: ProviderType,
+): Promise<ProviderAuthStatus> {
+  return requestJson<ProviderAuthStatus>(`/api/auth/${provider}/config`, {
+    method: 'DELETE',
   });
 }
 

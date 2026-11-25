@@ -10,6 +10,7 @@ build/
 .env
 .env.local
 .env.*.local
+.syncsound.oauth.json
 
 # Logs & coverage
 *.log

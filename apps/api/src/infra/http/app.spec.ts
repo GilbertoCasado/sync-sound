@@ -9,6 +9,7 @@ describe('GET /api/health', () => {
         NODE_ENV: 'test',
         FRONTEND_URL: 'http://localhost:5173',
         SESSION_SECRET: 'test-session-secret-0123456789',
+        OAUTH_CONFIG_FILE: '/tmp/syncsound-nonexistent-app-spec-oauth.json',
       },
     });
 

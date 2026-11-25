@@ -18,10 +18,16 @@ const PLATFORMS: ProviderType[] = ['deezer', 'spotify', 'youtube'];
 export interface MigrationFormProps {
   providers: ProviderAuthStatus[];
   isRunning: boolean;
+  onConnectProvider: (provider: ProviderType) => void;
   onSubmit: (payload: StartMigrationRequest) => Promise<void>;
 }
 
-export function MigrationForm({ providers, isRunning, onSubmit }: MigrationFormProps) {
+export function MigrationForm({
+  providers,
+  isRunning,
+  onConnectProvider,
+  onSubmit,
+}: MigrationFormProps) {
   const [sourcePlatform, setSourcePlatform] = useState<ProviderType>('deezer');
   const [targetPlatform, setTargetPlatform] = useState<ProviderType>('spotify');
   const [sourcePlaylistId, setSourcePlaylistId] = useState('');
@@ -158,6 +164,24 @@ export function MigrationForm({ providers, isRunning, onSubmit }: MigrationFormP
               </option>
             ))}
           </select>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {sourceStatus?.connected ? (
+              <span className="font-medium text-emerald-300">Conta conectada</span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onConnectProvider(sourcePlatform)}
+                  className="font-medium text-indigo-300 underline hover:text-indigo-200"
+                >
+                  Conectar {PLATFORM_LABELS[sourcePlatform]} agora
+                </button>
+                {sourcePlatform === 'deezer' && (
+                  <span className="text-slate-400">(ou use playlist pública sem login)</span>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div>
@@ -176,6 +200,24 @@ export function MigrationForm({ providers, isRunning, onSubmit }: MigrationFormP
               </option>
             ))}
           </select>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {targetStatus?.connected ? (
+              <span className="font-medium text-emerald-300">
+                Conta conectada (pronta para criar playlist)
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onConnectProvider(targetPlatform)}
+                  className="font-medium text-indigo-300 underline hover:text-indigo-200"
+                >
+                  Conectar {PLATFORM_LABELS[targetPlatform]} agora
+                </button>
+                <span className="text-slate-400">(ou simule com dryRun)</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

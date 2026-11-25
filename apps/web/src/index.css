@@ -63,3 +63,14 @@ progress.syncsound-progress::-moz-progress-bar {
     translate: 100cqi;
   }
 }
+
+dialog.syncsound-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.syncsound-dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgb(2 6 23 / 0.78);
+  backdrop-filter: blur(4px);
+}
