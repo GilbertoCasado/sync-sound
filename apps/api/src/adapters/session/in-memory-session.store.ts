@@ -15,6 +15,7 @@ export class InMemorySessionStore implements ISessionStore {
       id: randomUUID(),
       createdAt: Date.now(),
       providers: {},
+      oauthStates: {},
     };
     this.sessions.set(session.id, session);
     return session;
@@ -38,5 +39,27 @@ export class InMemorySessionStore implements ISessionStore {
       return;
     }
     delete session.providers[provider];
+  }
+
+  async setOAuthState(sessionId: string, provider: ProviderType, state: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    session.oauthStates[provider] = state;
+  }
+
+  async consumeOAuthState(
+    sessionId: string,
+    provider: ProviderType,
+    state: string,
+  ): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    const expected = session.oauthStates[provider];
+    delete session.oauthStates[provider];
+    return Boolean(expected && expected === state);
   }
 }

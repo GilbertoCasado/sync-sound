@@ -9,6 +9,7 @@ export interface StartMigrationRequest {
   sourcePlaylistId: string;
   targetPlaylistName?: string;
   dryRun?: boolean;
+  includeLowConfidence?: boolean;
 }
 
 export interface StartMigrationResponse {
@@ -61,3 +62,20 @@ export type MigrationProgressEvent =
       message: string;
       timestamp: string;
     };
+
+export interface MigrationJobSnapshot {
+  jobId: string;
+  status: MigrationJobStatus;
+  sourcePlatform: ProviderType;
+  targetPlatform: ProviderType;
+  sourcePlaylistId: string;
+  playlistName?: string;
+  dryRun: boolean;
+  totalTracks: number;
+  processedTracks: number;
+  events: MigrationProgressEvent[];
+  summary?: MigrationSummary;
+  error?: string;
+  createdAt: string;
+  finishedAt?: string;
+}

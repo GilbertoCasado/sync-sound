@@ -1,3 +1,65 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+progress.syncsound-progress {
+  appearance: none;
+  border: 0 solid;
+  overflow: clip;
+  container-type: inline-size;
+  inline-size: 100%;
+  block-size: 0.75rem;
+  border-radius: 9999px;
+  background: rgb(30 41 59);
+  --progress-bar-fill: linear-gradient(90deg, #10b981, #6366f1);
+  --progress-bar-indeterminate-size: 30%;
+  --progress-bar-indeterminate-animation-duration: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.syncsound-progress {
+    --progress-bar-indeterminate-animation-duration: 10s;
+  }
+}
+
+progress.syncsound-progress:indeterminate {
+  --progress-bar-animation: progress-bar-indeterminate
+    var(--progress-bar-indeterminate-animation-duration) infinite linear;
+}
+
+progress.syncsound-progress:dir(rtl):indeterminate {
+  --progress-bar-animation: progress-bar-indeterminate
+    var(--progress-bar-indeterminate-animation-duration) infinite linear reverse;
+}
+
+progress.syncsound-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+progress.syncsound-progress::-webkit-progress-value {
+  background: var(--progress-bar-fill);
+  border-radius: 9999px;
+  transition: inline-size 0.25s ease-out;
+  animation: var(--progress-bar-animation, none);
+}
+
+progress.syncsound-progress::-moz-progress-bar {
+  background: var(--progress-bar-fill);
+  border-radius: 9999px;
+  transition: inline-size 0.25s ease-out;
+  animation: var(--progress-bar-animation, none);
+}
+
+@keyframes progress-bar-indeterminate {
+  from,
+  to {
+    inline-size: var(--progress-bar-indeterminate-size);
+    margin-right: auto;
+  }
+  from {
+    translate: -100%;
+  }
+  to {
+    translate: 100cqi;
+  }
+}

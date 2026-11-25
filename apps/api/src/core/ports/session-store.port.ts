@@ -5,6 +5,7 @@ export interface UserSession {
   id: string;
   createdAt: number;
   providers: Partial<Record<ProviderType, ProviderCredentials>>;
+  oauthStates: Partial<Record<ProviderType, string>>;
 }
 
 export interface ISessionStore {
@@ -16,4 +17,6 @@ export interface ISessionStore {
     credentials: ProviderCredentials,
   ): Promise<void>;
   removeProviderCredentials(sessionId: string, provider: ProviderType): Promise<void>;
+  setOAuthState(sessionId: string, provider: ProviderType, state: string): Promise<void>;
+  consumeOAuthState(sessionId: string, provider: ProviderType, state: string): Promise<boolean>;
 }
