@@ -1,0 +1,25 @@
+{
+  "name": "sync-sound",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Migrador e sincronizador multi-streaming de playlists entre Spotify, Deezer e YouTube Music",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace=@syncsound/api",
+    "dev:web": "npm run dev --workspace=@syncsound/web",
+    "build": "npm run build --workspace=@syncsound/shared && npm run build --workspace=@syncsound/api && npm run build --workspace=@syncsound/web",
+    "typecheck": "npm run build --workspace=@syncsound/shared && npm run typecheck --workspace=@syncsound/api && npm run typecheck --workspace=@syncsound/web",
+    "test": "npm run build --workspace=@syncsound/shared && npm run test --workspace=@syncsound/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
