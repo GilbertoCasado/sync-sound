@@ -13,9 +13,12 @@ export interface UseOAuthPopupOptions {
   onError: (message: string) => void;
 }
 
+const POPUP_FOCUS_GRACE_MS = 1200;
+const POPUP_MAX_WAIT_MS = 2 * 60 * 1000;
+
 export function useOAuthPopup({ onSuccess, onError }: UseOAuthPopupOptions) {
   const [connectingProvider, setConnectingProvider] = useState<ProviderType | null>(null);
-  const popupRef = useRef<Window | null>(null);
+  const openedAtRef = useRef<number>(0);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
 
@@ -38,7 +41,6 @@ export function useOAuthPopup({ onSuccess, onError }: UseOAuthPopupOptions) {
         return;
       }
 
-      popupRef.current = null;
       setConnectingProvider(null);
 
       if (data.status === 'success') {
@@ -59,16 +61,24 @@ export function useOAuthPopup({ onSuccess, onError }: UseOAuthPopupOptions) {
       return;
     }
 
-    const timer = window.setInterval(() => {
-      const popup = popupRef.current;
-      if (popup && popup.closed) {
-        popupRef.current = null;
-        setConnectingProvider(null);
+    // Não fazemos polling de popup.closed porque páginas OAuth (Google/Spotify)
+    // aplicam Cross-Origin-Opener-Policy (COOP), o que gera erros no console.
+    const handleWindowFocus = () => {
+      if (Date.now() - openedAtRef.current >= POPUP_FOCUS_GRACE_MS) {
+        window.setTimeout(() => {
+          setConnectingProvider(null);
+        }, 300);
       }
-    }, 500);
+    };
 
+    const safetyTimeout = window.setTimeout(() => {
+      setConnectingProvider(null);
+    }, POPUP_MAX_WAIT_MS);
+
+    window.addEventListener('focus', handleWindowFocus);
     return () => {
-      window.clearInterval(timer);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.clearTimeout(safetyTimeout);
     };
   }, [connectingProvider]);
 
@@ -90,7 +100,7 @@ export function useOAuthPopup({ onSuccess, onError }: UseOAuthPopupOptions) {
       return;
     }
 
-    popupRef.current = popup;
+    openedAtRef.current = Date.now();
     setConnectingProvider(provider);
     popup.focus();
   }, []);
