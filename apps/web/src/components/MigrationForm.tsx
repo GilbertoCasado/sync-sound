@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type {
   PlaylistSummary,
   ProviderAuthStatus,
@@ -14,6 +14,23 @@ const PLATFORM_LABELS: Record<ProviderType, string> = {
 };
 
 const PLATFORMS: ProviderType[] = ['deezer', 'spotify', 'youtube'];
+
+function detectPlatformFromInput(raw: string): ProviderType | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^spotify:playlist:[A-Za-z0-9]+$/i.test(trimmed) || /open\.spotify\.com\/playlist\//i.test(trimmed)) {
+    return 'spotify';
+  }
+  if (/deezer\.com\/(?:[a-z]{2}\/)?playlist\/\d+/i.test(trimmed)) {
+    return 'deezer';
+  }
+  if (/(?:www\.|music\.)?youtube\.com\/.*[?&]list=/i.test(trimmed) || /youtu\.be\/.*[?&]list=/i.test(trimmed)) {
+    return 'youtube';
+  }
+  return null;
+}
 
 export interface MigrationFormProps {
   providers: ProviderAuthStatus[];
@@ -39,9 +56,22 @@ export function MigrationForm({
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [playlistsError, setPlaylistsError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [autoDetectedHint, setAutoDetectedHint] = useState<string | null>(null);
+  const userPickedPlatformsRef = useRef(false);
 
   const sourceStatus = providers.find((p) => p.provider === sourcePlatform);
   const targetStatus = providers.find((p) => p.provider === targetPlatform);
+
+  useEffect(() => {
+    if (userPickedPlatformsRef.current || sourcePlaylistId.trim()) {
+      return;
+    }
+    const connected = providers.filter((p) => p.connected).map((p) => p.provider);
+    if (connected.length >= 2 && !connected.includes(sourcePlatform)) {
+      setSourcePlatform(connected[0]!);
+      setTargetPlatform(connected[1]!);
+    }
+  }, [providers, sourcePlatform, sourcePlaylistId]);
 
   useEffect(() => {
     if (!targetStatus?.connected) {
@@ -85,9 +115,37 @@ export function MigrationForm({
   }, [sourcePlatform, sourceStatus?.connected]);
 
   const handleSwapPlatforms = () => {
+    userPickedPlatformsRef.current = true;
     setSourcePlatform(targetPlatform);
     setTargetPlatform(sourcePlatform);
+    setAutoDetectedHint(null);
     setFormError(null);
+  };
+
+  const handlePlaylistInputChange = (value: string) => {
+    setSourcePlaylistId(value);
+    setFormError(null);
+
+    if (!value.trim()) {
+      setAutoDetectedHint(null);
+      return;
+    }
+
+    const detected = detectPlatformFromInput(value);
+    if (detected && detected !== sourcePlatform) {
+      userPickedPlatformsRef.current = true;
+      setSourcePlatform(detected);
+      if (targetPlatform === detected) {
+        const altConnected = providers.find((p) => p.connected && p.provider !== detected)?.provider;
+        const altAny = PLATFORMS.find((p) => p !== detected) ?? 'spotify';
+        setTargetPlatform(altConnected ?? altAny);
+      }
+      setAutoDetectedHint(
+        `URL do ${PLATFORM_LABELS[detected]} detectada — plataforma de origem ajustada automaticamente.`,
+      );
+    } else if (!detected) {
+      setAutoDetectedHint(null);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -155,7 +213,11 @@ export function MigrationForm({
           <select
             id="source-platform"
             value={sourcePlatform}
-            onChange={(e) => setSourcePlatform(e.target.value as ProviderType)}
+            onChange={(e) => {
+              userPickedPlatformsRef.current = true;
+              setAutoDetectedHint(null);
+              setSourcePlatform(e.target.value as ProviderType);
+            }}
             className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
           >
             {PLATFORMS.map((platform) => (
@@ -191,7 +253,10 @@ export function MigrationForm({
           <select
             id="target-platform"
             value={targetPlatform}
-            onChange={(e) => setTargetPlatform(e.target.value as ProviderType)}
+            onChange={(e) => {
+              userPickedPlatformsRef.current = true;
+              setTargetPlatform(e.target.value as ProviderType);
+            }}
             className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none"
           >
             {PLATFORMS.map((platform) => (
@@ -261,7 +326,7 @@ export function MigrationForm({
             id="source-playlist-id"
             type="text"
             value={sourcePlaylistId}
-            onChange={(e) => setSourcePlaylistId(e.target.value)}
+            onChange={(e) => handlePlaylistInputChange(e.target.value)}
             placeholder={
               sourcePlatform === 'deezer'
                 ? 'Ex.: 908622995 ou https://www.deezer.com/playlist/908622995'
@@ -269,7 +334,10 @@ export function MigrationForm({
             }
             className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none"
           />
-          {sourcePlatform === 'deezer' && (
+          {autoDetectedHint && (
+            <p className="mt-1 text-xs text-indigo-300">{autoDetectedHint}</p>
+          )}
+          {sourcePlatform === 'deezer' && !autoDetectedHint && (
             <p className="mt-1 text-xs text-slate-400">
               Dica: qualquer playlist pública do Deezer funciona mesmo sem OAuth.
             </p>

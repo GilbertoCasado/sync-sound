@@ -22,6 +22,14 @@ describe('http-client utilities', () => {
     ).toBe('PL12345_abc-XYZ');
   });
 
+  it('rejeita URL de outra plataforma e IDs não numéricos no Deezer', () => {
+    expect(() =>
+      parsePlaylistId('deezer', 'https://open.spotify.com/playlist/2Y0GIEpKqtCOvjR7m8cXKx?si=123'),
+    ).toThrow(/Spotify.*Deezer/i);
+
+    expect(() => parsePlaylistId('deezer', 'playlist-invalida')).toThrow(/ID numérico/i);
+  });
+
   it('converte duração ISO 8601 do YouTube para milissegundos', () => {
     expect(parseIso8601DurationMs('PT4M13S')).toBe(253_000);
     expect(parseIso8601DurationMs('PT1H2M3S')).toBe(3_723_000);

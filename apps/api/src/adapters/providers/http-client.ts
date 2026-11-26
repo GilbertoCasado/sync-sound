@@ -96,10 +96,44 @@ export async function fetchJsonWithRetry<T>(
   throw new Error(`Falha ao chamar ${sanitizeUrlForLog(url)} após ${maxRetries + 1} tentativas.`);
 }
 
+const PROVIDER_LABELS: Record<ProviderType, string> = {
+  spotify: 'Spotify',
+  deezer: 'Deezer',
+  youtube: 'YouTube Music',
+};
+
+export function detectPlatformFromPlaylistUrl(rawInput: string): ProviderType | null {
+  const trimmed = rawInput.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^spotify:playlist:[A-Za-z0-9]+$/i.test(trimmed) || /open\.spotify\.com\/playlist\//i.test(trimmed)) {
+    return 'spotify';
+  }
+
+  if (/deezer\.com\/(?:[a-z]{2}\/)?playlist\/\d+/i.test(trimmed)) {
+    return 'deezer';
+  }
+
+  if (/(?:www\.|music\.)?youtube\.com\/.*[?&]list=/i.test(trimmed) || /youtu\.be\/.*[?&]list=/i.test(trimmed)) {
+    return 'youtube';
+  }
+
+  return null;
+}
+
 export function parsePlaylistId(platform: ProviderType, rawInput: string): string {
   const trimmed = rawInput.trim();
   if (!trimmed) {
     throw new Error('O identificador ou URL da playlist não pode ser vazio.');
+  }
+
+  const detected = detectPlatformFromPlaylistUrl(trimmed);
+  if (detected && detected !== platform) {
+    throw new Error(
+      `A URL informada é do ${PROVIDER_LABELS[detected]}, mas a plataforma de origem selecionada é ${PROVIDER_LABELS[platform]}. Altere a plataforma de origem.`,
+    );
   }
 
   if (platform === 'spotify') {
@@ -116,10 +150,13 @@ export function parsePlaylistId(platform: ProviderType, rawInput: string): strin
 
   if (platform === 'deezer') {
     const urlMatch = trimmed.match(/deezer\.com\/(?:[a-z]{2}\/)?playlist\/(\d+)/i);
-    if (urlMatch?.[1]) {
-      return urlMatch[1];
+    const extracted = urlMatch?.[1] ?? trimmed;
+    if (!/^\d+$/.test(extracted)) {
+      throw new Error(
+        'ID de playlist do Deezer inválido. Informe um ID numérico ou URL válida do Deezer.',
+      );
     }
-    return trimmed;
+    return extracted;
   }
 
   const ytMatch = trimmed.match(/[?&]list=([A-Za-z0-9_-]+)/);
